@@ -532,37 +532,115 @@ Vistas.historial.refrescable = true;
 function confirmar(msg) { return window.confirm(msg); }
 
 // ---------------- Ajustes ----------------
+// ---------------- PIN de administrador (protege la conexión en este dispositivo) ----------------
+const Pin = {
+  desbloqueadoHasta: 0,
+  async hash(pin) {
+    const d = new TextEncoder().encode('campo-mango:' + pin);
+    const h = await crypto.subtle.digest('SHA-256', d);
+    return [...new Uint8Array(h)].map(b => b.toString(16).padStart(2, '0')).join('');
+  },
+  tiene() { return !!Datos.config.pinHash; },
+  /** Pide el PIN (si existe). Devuelve true si se puede continuar. Queda desbloqueado 5 minutos. */
+  async verificar(motivo) {
+    if (!this.tiene() || Date.now() < this.desbloqueadoHasta) return true;
+    const pin = await pedirPin(motivo || 'Ingresa el PIN de administrador');
+    if (pin === null) return false;
+    if (await this.hash(pin) !== Datos.config.pinHash) { UI.toast('PIN incorrecto'); return false; }
+    this.desbloqueadoHasta = Date.now() + 5 * 60 * 1000;
+    return true;
+  }
+};
+
+function pedirPin(titulo, confirmarTxt) {
+  return new Promise(ok => {
+    const capa = document.createElement('div');
+    capa.className = 'capa';
+    capa.innerHTML = `<form class="modal"><h3>🔒 ${esc(titulo)}</h3>
+      <input type="password" inputmode="numeric" autocomplete="off" maxlength="12" placeholder="PIN" id="pin-in">
+      <div class="modal-bts"><button type="button" class="mini" id="pin-no">Cancelar</button><button type="submit" class="guardar chico">${esc(confirmarTxt || 'Aceptar')}</button></div></form>`;
+    document.body.appendChild(capa);
+    const inp = capa.querySelector('#pin-in'); setTimeout(() => inp.focus(), 50);
+    const fin = v => { capa.remove(); ok(v); };
+    capa.querySelector('#pin-no').onclick = () => fin(null);
+    capa.querySelector('form').onsubmit = e => { e.preventDefault(); fin(inp.value.trim()); };
+  });
+}
+
+const ocultarUrl = u => { const m = String(u).match(/\/s\/([^/]+)\//); return m ? 'script.google.com/…' + m[1].slice(-6) + '/exec' : (u ? '••••••' : '—'); };
+
+// ---------------- Ajustes ----------------
+let ajustesEditar = false; // solo se activa después de pasar el PIN (no por la URL)
 Vistas.ajustes = () => {
   const cs = Datos.catalogo('Campanas');
-  UI.pintar(`
+  const configurada = !!Datos.config.api;
+  const editar = !configurada || ajustesEditar;
+  ajustesEditar = false;
+  const formConexion = `
     <form id="aj" class="frm">
-      ${!Datos.config.api ? '<p class="ayuda">Primera vez: pega la URL de la API y la clave (las obtienes al instalar el Apps Script). O abre el enlace de configuración que te enviaron.</p>' : ''}
-      <div class="campo"><label class="etq">URL de la API (Apps Script)</label><input type="url" id="api" value="${esc(Datos.config.api)}" placeholder="https://script.google.com/macros/s/.../exec"></div>
-      <div class="campo"><label class="etq">Clave</label><input type="text" id="clave" value="${esc(Datos.config.clave)}"></div>
-      ${cs.length ? `<div class="campo"><label class="etq">Campaña para los registros</label><select id="camp"><option value="">Automática (activa)</option>${cs.map(c => `<option ${Datos.config.campana === c.ID_Campana ? 'selected' : ''}>${esc(c.ID_Campana)}</option>`).join('')}</select></div>` : ''}
+      ${!configurada ? '<p class="ayuda">Primera vez: pega la URL de la API y la clave (las obtienes al instalar el Apps Script). O abre el enlace de configuración que te enviaron.</p>' : ''}
+      <div class="campo"><label class="etq">URL de la API (Apps Script)</label><input type="url" id="api" value="${esc(Datos.config.api)}" placeholder="https://script.google.com/macros/s/.../exec" autocomplete="off"></div>
+      <div class="campo"><label class="etq">Clave</label>
+        <div class="con-ojo"><input type="password" id="clave" value="${esc(Datos.config.clave)}" autocomplete="off"><button type="button" class="ojo" id="ojo" aria-label="Mostrar clave">👁</button></div></div>
       <button class="guardar" type="submit">Guardar y probar conexión</button>
-    </form>
+      ${configurada ? '<a class="mini centro" href="#/ajustes">Cancelar</a>' : ''}
+    </form>`;
+  const tarjetaConexion = `
+    <div class="tarjeta">
+      <div class="kv"><span>Conexión</span><b>${Sync.ultimoError ? '⚠️ con problemas' : '✓ conectada'}</b></div>
+      <div class="kv"><span>API</span><span>${esc(ocultarUrl(Datos.config.api))}</span></div>
+      <div class="kv"><span>Clave</span><span>••••••••</span></div>
+      <button class="mini" id="ver-con">🔒 Ver o cambiar conexión</button>
+      <button class="mini" id="enlace">🔒 Copiar enlace de configuración</button>
+    </div>
+    <div class="tarjeta">
+      <div class="kv"><span>PIN de administrador</span><b>${Pin.tiene() ? '✓ activado' : 'sin PIN'}</b></div>
+      ${Pin.tiene() ? '' : '<div class="det">Crea un PIN para que nadie más pueda ver la conexión ni copiar el enlace desde este celular.</div>'}
+      <button class="mini" id="pin">${Pin.tiene() ? 'Cambiar o quitar PIN' : 'Crear PIN'}</button>
+    </div>`;
+  UI.pintar(`
+    ${editar ? formConexion : tarjetaConexion}
+    ${configurada && !editar && cs.length ? `<div class="tarjeta"><div class="campo"><label class="etq">Campaña para los registros</label><select id="camp"><option value="">Automática (activa)</option>${cs.map(c => `<option ${Datos.config.campana === c.ID_Campana ? 'selected' : ''}>${esc(c.ID_Campana)}</option>`).join('')}</select></div></div>` : ''}
     <div class="tarjeta">
       <div class="kv"><span>Versión de la app</span><b>${self.APP_VERSION}</b></div>
       <div class="kv"><span>Versión de la API</span><b>${esc(Datos.srv ? Datos.srv.version : '—')}</b></div>
       <div class="kv"><span>Registros por enviar</span><b>${Datos.cola.length}</b></div>
       ${Sync.ultimoError ? `<div class="err">Último error: ${esc(Sync.ultimoError)}</div>` : ''}
-      <button class="mini" id="sinc">Sincronizar ahora</button>
-      <button class="mini" id="enlace">Copiar enlace de configuración</button>
-    </div>`, { titulo: '⚙️ Ajustes', atras: !!Datos.config.api });
-  $('#aj').onsubmit = async e => {
-    e.preventDefault();
-    Datos.config.api = $('#api').value.trim(); Datos.config.clave = $('#clave').value.trim();
-    if ($('#camp')) Datos.config.campana = $('#camp').value;
-    await Datos.guardarConfig();
-    try { await Sync.get('ping'); UI.toast('Conexión correcta ✓'); await Sync.ejecutar(true); location.hash = '#/'; }
-    catch (err) { UI.toast('No conecta: ' + (err.message || err)); }
-  };
-  $('#sinc').onclick = () => Sync.ejecutar();
-  $('#enlace').onclick = async () => {
-    const u = location.origin + location.pathname + '#/config?api=' + encodeURIComponent(Datos.config.api) + '&k=' + encodeURIComponent(Datos.config.clave);
-    try { await navigator.clipboard.writeText(u); UI.toast('Enlace copiado. Envíalo por WhatsApp a quien usará la app.'); } catch (e) { prompt('Copia este enlace:', u); }
-  };
+      ${configurada ? '<button class="mini" id="sinc">Sincronizar ahora</button>' : ''}
+    </div>`, { titulo: '⚙️ Ajustes', atras: configurada });
+
+  if (editar) {
+    $('#ojo').onclick = () => { const c = $('#clave'); c.type = c.type === 'password' ? 'text' : 'password'; };
+    $('#aj').onsubmit = async e => {
+      e.preventDefault();
+      Datos.config.api = $('#api').value.trim(); Datos.config.clave = $('#clave').value.trim();
+      await Datos.guardarConfig();
+      try { await Sync.get('ping'); UI.toast('Conexión correcta ✓'); await Sync.ejecutar(true); location.hash = '#/'; }
+      catch (err) { UI.toast('No conecta: ' + (err.message || err)); }
+    };
+  } else {
+    $('#ver-con').onclick = async () => { if (await Pin.verificar('PIN para ver la conexión')) { ajustesEditar = true; Vistas.ajustes(); } };
+    $('#enlace').onclick = async () => {
+      if (!(await Pin.verificar('PIN para copiar el enlace'))) return;
+      const u = location.origin + location.pathname + '#/config?api=' + encodeURIComponent(Datos.config.api) + '&k=' + encodeURIComponent(Datos.config.clave);
+      try { await navigator.clipboard.writeText(u); UI.toast('Enlace copiado. Envíalo y bórralo del chat cuando lo usen.'); } catch (e) { prompt('Copia este enlace:', u); }
+    };
+    $('#pin').onclick = async () => {
+      if (Pin.tiene() && !(await Pin.verificar('PIN actual'))) return;
+      const p1 = await pedirPin(Pin.tiene() ? 'Nuevo PIN (vacío = quitar PIN)' : 'Crea un PIN (4 a 12 números)', 'Siguiente');
+      if (p1 === null) return;
+      if (p1 === '' && Pin.tiene()) { delete Datos.config.pinHash; await Datos.guardarConfig(); UI.toast('PIN quitado'); Vistas.ajustes(); return; }
+      if (!/^\d{4,12}$/.test(p1)) { UI.toast('El PIN debe tener de 4 a 12 números'); return; }
+      const p2 = await pedirPin('Repite el PIN', 'Guardar');
+      if (p2 !== p1) { UI.toast('Los PIN no coinciden'); return; }
+      Datos.config.pinHash = await Pin.hash(p1); await Datos.guardarConfig();
+      Pin.desbloqueadoHasta = 0;
+      UI.toast('PIN guardado ✓'); Vistas.ajustes();
+    };
+    const camp = $('#camp');
+    if (camp) camp.onchange = async () => { Datos.config.campana = camp.value; await Datos.guardarConfig(); UI.toast('Campaña guardada ✓'); };
+  }
+  const sinc = $('#sinc'); if (sinc) sinc.onclick = () => Sync.ejecutar();
 };
 
 // Enlace de configuración: #/config?api=...&k=...

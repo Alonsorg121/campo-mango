@@ -40,3 +40,4 @@ Clave de prueba: `clave-prueba`.
 
 ## Historial de versiones
 - 1.0.0 (nov 2026): formularios de jornal (grupal), labor, aplicación, compra, gasto, venta (kg/jaba), cobro, plan de fertilización y catálogos; vistas de pagar planilla, resumen, stock, por cobrar, clima e historial; modo offline.
+- 1.1.0 (nov 2026): Ajustes con URL y clave ocultas; PIN de administrador local (hash SHA-256 en `config.pinHash`) para ver o cambiar la conexión y copiar el enlace de configuración. Prueba: `pruebas/prueba_pin.js`.
