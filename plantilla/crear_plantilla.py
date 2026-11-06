@@ -346,7 +346,7 @@ txt = [
  ("MÓDULO CLIMA (automático)", "h"),
  ("Hojas: Clima (un registro por día) y Clima_Hoy (pronóstico del día, se actualiza cada 3 horas). Se llenan solas: no escribas en ellas.", ""),
  ("1. En el Google Sheets: Extensiones > Apps Script. Pega el código del archivo Clima_AppsScript.gs y guarda.", ""),
- ("2. La ubicación del campo ya está puesta (-4.884565, -80.268667).", ""),
+ ("2. Revisa que LAT y LON en Clima tengan la ubicación de tu campo.", ""),
  ("3. Elige la función 'instalar' y presiona Ejecutar (acepta los permisos de Google). Carga el histórico desde el 1 de abril de 2026 y desde ahí funciona solo, cada 3 horas.", ""),
  ("4. En el Sheets aparece un menú 'Clima' para actualizar a mano si lo necesitas.", ""),
  ("5. La app muestra el clima automáticamente en la pantalla de inicio y en la sección Clima.", ""),
