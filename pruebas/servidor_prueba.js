@@ -6,7 +6,7 @@
  */
 const http = require('http'), fs = require('fs'), path = require('path'), vm = require('vm'), { execFileSync } = require('child_process');
 const RAIZ = path.join(__dirname, '..');
-const PLANTILLA = path.join(RAIZ, 'plantilla', 'Campo_Mango_BaseDatos.xlsx');
+const PLANTILLA = process.env.PLANTILLA || path.join(RAIZ, 'plantilla', 'Campo_Mango_BaseDatos.xlsx');
 const TMP = fs.mkdtempSync('/tmp/campo-');
 const PUERTO = +process.argv[2] || 8080;
 const CLAVE = 'clave-prueba';
@@ -72,7 +72,7 @@ function Hoja(nombre) {
 const props = { API_CLAVE: CLAVE };
 const fotos = [];
 const ctx = {
-  SpreadsheetApp: { getActive: () => ({ getSheetByName: n => estado[n] ? Hoja(n) : null }), flush: () => {} },
+  SpreadsheetApp: { getActive: () => ({ getSheetByName: n => estado[n] ? Hoja(n) : null, insertSheet: n => { estado[n] = [[]]; sucio = true; return Hoja(n); } }), flush: () => {} },
   PropertiesService: { getScriptProperties: () => ({ getProperty: k => props[k], setProperty: (k, v) => { props[k] = v; }, deleteProperty: k => { delete props[k]; } }) },
   LockService: { getScriptLock: () => ({ waitLock: () => {}, releaseLock: () => {} }) },
   ContentService: { MimeType: { JSON: 'json' }, createTextOutput: t => ({ t, setMimeType() { return this; } }) },

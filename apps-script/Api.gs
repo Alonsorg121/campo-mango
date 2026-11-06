@@ -17,7 +17,7 @@
  *  Implementar > Gestionar implementaciones > (lápiz) > Versión: Nueva versión > Implementar.
  */
 
-const API_VERSION = '1.1.0';
+const API_VERSION = '1.2.0';
 
 // Tablas que la app puede leer como catálogos (listas para elegir).
 const API_CATALOGOS = ['Lotes', 'Campanas', 'Trabajadores', 'Productos', 'Proveedores',
@@ -25,7 +25,20 @@ const API_CATALOGOS = ['Lotes', 'Campanas', 'Trabajadores', 'Productos', 'Provee
 
 // Tablas de registros (la app agrega filas). Se devuelven las últimas N filas.
 const API_REGISTROS = ['Planilla', 'Bitacora_Labores', 'Compras_Insumos', 'Aplicaciones',
-  'Plan_Fertilizacion', 'Costos', 'Ventas', 'Cobros'];
+  'Plan_Fertilizacion', 'Costos', 'Ventas', 'Cobros', 'Cosecha', 'Floracion', 'Riego', 'Sanidad', 'Analisis'];
+
+/**
+ * Hojas y columnas que la API crea sola si no existen (así no hay que editar el Sheets a mano).
+ * Las columnas nuevas de hojas existentes se agregan SIEMPRE AL FINAL.
+ */
+const API_ESTRUCTURA = {
+  Cosecha: ['ID', 'Fecha', 'Campana', 'Lote', 'Unidad', 'Cantidad', 'Kg_por_Jaba', 'Kg_Cosechados', 'Kg_Descarte', 'Causa_Descarte', 'Foto', 'Observaciones'],
+  Floracion: ['ID', 'Fecha', 'Campana', 'Lote', 'Etapa', 'Pct_Plantas', 'Cuajado', 'Foto', 'Observaciones'],
+  Riego: ['ID', 'Fecha', 'Campana', 'Lote', 'Horas', 'M3', 'Observaciones'],
+  Sanidad: ['ID', 'Fecha', 'Campana', 'Lote', 'Plaga', 'Trampas', 'Capturas', 'Dias_Exposicion', 'MTD', 'Pct_Afectado', 'Nivel', 'Foto', 'Observaciones'],
+  Analisis: ['ID', 'Fecha', 'Campana', 'Lote', 'Tipo', 'Laboratorio', 'Resumen', 'Foto'],
+  Ventas: ['ID_Cosecha']   // columna nueva al final de Ventas
+};
 
 // Catálogos que la app también puede ampliar (agregar trabajador, producto, etc.).
 const API_CATALOGOS_EDITABLES = ['Trabajadores', 'Productos', 'Proveedores', 'Compradores'];
@@ -53,6 +66,8 @@ const API_FORMULAS = {
     Cantidad_Aplicada: '=SUMIFS({Aplicaciones.Cantidad},{Aplicaciones.Campana},{Campana},{Aplicaciones.Lote},{Lote},{Aplicaciones.Producto},{Producto})',
     Avance: '=IFERROR({Cantidad_Aplicada}/{Cantidad_Programada},0)'
   },
+  Cosecha: { Kg_Cosechados: '=IF({Unidad}="Jaba",{Cantidad}*{Kg_por_Jaba},{Cantidad})' },
+  Sanidad: { MTD: '=IF(AND({Trampas}>0,{Dias_Exposicion}>0),{Capturas}/({Trampas}*{Dias_Exposicion}),"")' },
   Ventas: {
     Kg_Totales: '=IF({Unidad}="Kg",{Cantidad},{Cantidad}*{Kg_por_Jaba})',
     Total: '={Cantidad}*{Precio_Unitario}'
@@ -106,6 +121,7 @@ function apiCambiarClave() {
 function doGet(e) {
   return apiResponder_(() => {
     apiVerificarClave_(e.parameter.k);
+    apiAsegurarEstructura_();
     const accion = e.parameter.accion || 'datos';
     if (accion === 'ping') return { version: API_VERSION };
     if (accion === 'datos') return apiDatos_();
@@ -121,6 +137,7 @@ function doPost(e) {
     const lock = LockService.getScriptLock();
     lock.waitLock(30000);
     try {
+      apiAsegurarEstructura_();
       const resultados = (body.ops || []).map(op => {
         try {
           if (op.op === 'agregar') return Object.assign({ uid: op.uid, ok: true }, apiAgregar_(op));
@@ -146,6 +163,32 @@ function apiResponder_(fn) {
     out = { ok: false, error: String(err.message || err) };
   }
   return ContentService.createTextOutput(JSON.stringify(out)).setMimeType(ContentService.MimeType.JSON);
+}
+
+/** Crea las hojas o columnas que falten (según API_ESTRUCTURA). Rápido si ya existen. */
+function apiAsegurarEstructura_() {
+  const props = PropertiesService.getScriptProperties();
+  if (props.getProperty('API_ESTRUCTURA_OK') === API_VERSION) return;
+  const ss = SpreadsheetApp.getActive();
+  Object.keys(API_ESTRUCTURA).forEach(nombre => {
+    const cols = API_ESTRUCTURA[nombre];
+    let sh = ss.getSheetByName(nombre);
+    if (!sh) {
+      sh = ss.insertSheet(nombre);
+      sh.getRange(1, 1, 1, cols.length).setValues([cols]);
+      try { sh.getRange(1, 1, 1, cols.length).setFontWeight('bold').setBackground('#2E7D32').setFontColor('#FFFFFF'); sh.setFrozenRows(1); } catch (e) {}
+      return;
+    }
+    const ultima = Math.max(1, sh.getLastColumn());
+    const enc = sh.getRange(1, 1, 1, ultima).getValues()[0].map(String);
+    const faltan = cols.filter(c => enc.indexOf(c) < 0);
+    if (faltan.length) {
+      const desde = enc.filter(String).length + 1;
+      sh.getRange(1, desde, 1, faltan.length).setValues([faltan]);
+      try { sh.getRange(1, desde, 1, faltan.length).setFontWeight('bold').setBackground('#2E7D32').setFontColor('#FFFFFF'); } catch (e) {}
+    }
+  });
+  props.setProperty('API_ESTRUCTURA_OK', API_VERSION);
 }
 
 function apiVerificarClave_(k) {
@@ -191,7 +234,8 @@ function apiDatos_() {
 function apiTablero_() {
   const ss = SpreadsheetApp.getActive();
   const tablas = {};
-  ['Planilla', 'Aplicaciones', 'Compras_Insumos', 'Costos', 'Ventas', 'Cobros', 'Plan_Fertilizacion', 'Clima'].forEach(n => {
+  ['Planilla', 'Aplicaciones', 'Compras_Insumos', 'Costos', 'Ventas', 'Cobros', 'Plan_Fertilizacion', 'Clima',
+    'Cosecha', 'Floracion', 'Riego', 'Sanidad', 'Analisis'].forEach(n => {
     const sh = ss.getSheetByName(n);
     if (!sh) return;
     const datos = sh.getDataRange().getValues();

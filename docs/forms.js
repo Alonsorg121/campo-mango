@@ -13,11 +13,13 @@
  *  texto     → texto corto      | nota → texto largo
  *  foto      → cámara del celular (se guarda en Google Drive)
  *  oculto    → valor fijo que no se muestra
+ * grupo del formulario: 'campo' | 'evaluacion' | 'plata' (pantalla de inicio) o menu: 'mas'.
+ * rellena(registroElegido, valores) → en un select, completa otros campos al elegir (ej. venta desde una cosecha).
  * Otras propiedades: req (obligatorio), def (valor por defecto), si (mostrar solo si...), etiqueta (texto o función)
  */
 const FORMULARIOS = [
   {
-    id: 'jornal', titulo: 'Jornal / tarea', icono: '👷', tabla: 'Planilla', prefijo: 'PL',
+    id: 'jornal', grupo: 'campo', titulo: 'Jornal / tarea', icono: '👷', tabla: 'Planilla', prefijo: 'PL',
     ayuda: 'Marca a todos los que trabajaron: se crea un registro por cada uno.',
     campos: [
       { n: 'Fecha', t: 'fecha', req: true },
@@ -42,7 +44,7 @@ const FORMULARIOS = [
     totalEtiqueta: 'Total a pagar'
   },
   {
-    id: 'labor', titulo: 'Labor del día', icono: '📝', tabla: 'Bitacora_Labores', prefijo: 'BL',
+    id: 'labor', grupo: 'campo', titulo: 'Labor del día', icono: '📝', tabla: 'Bitacora_Labores', prefijo: 'BL',
     campos: [
       { n: 'Fecha', t: 'fecha', req: true },
       { n: 'Campana', t: 'campana' },
@@ -56,7 +58,7 @@ const FORMULARIOS = [
     ]
   },
   {
-    id: 'aplicacion', titulo: 'Aplicación de insumo', icono: '🧪', tabla: 'Aplicaciones', prefijo: 'AP',
+    id: 'aplicacion', grupo: 'campo', titulo: 'Aplicación de insumo', icono: '🧪', tabla: 'Aplicaciones', prefijo: 'AP',
     campos: [
       { n: 'Fecha', t: 'fecha', req: true },
       { n: 'Campana', t: 'campana' },
@@ -70,7 +72,7 @@ const FORMULARIOS = [
     ]
   },
   {
-    id: 'compra', titulo: 'Compra de insumo', icono: '🛒', tabla: 'Compras_Insumos', prefijo: 'CI',
+    id: 'compra', grupo: 'plata', titulo: 'Compra de insumo', icono: '🛒', tabla: 'Compras_Insumos', prefijo: 'CI',
     campos: [
       { n: 'Fecha', t: 'fecha', req: true },
       { n: 'Campana', t: 'campana' },
@@ -86,7 +88,7 @@ const FORMULARIOS = [
     total: f => num(f.Cantidad) * num(f.Precio_Unitario)
   },
   {
-    id: 'gasto', titulo: 'Gasto', icono: '💸', tabla: 'Costos', prefijo: 'CO',
+    id: 'gasto', grupo: 'plata', titulo: 'Gasto', icono: '💸', tabla: 'Costos', prefijo: 'CO',
     campos: [
       { n: 'Fecha', t: 'fecha', req: true },
       { n: 'Campana', t: 'campana' },
@@ -101,10 +103,12 @@ const FORMULARIOS = [
     ]
   },
   {
-    id: 'venta', titulo: 'Venta', icono: '🥭', tabla: 'Ventas', prefijo: 'VE',
+    id: 'venta', grupo: 'plata', titulo: 'Venta', icono: '🥭', tabla: 'Ventas', prefijo: 'VE',
     campos: [
       { n: 'Fecha', t: 'fecha', req: true },
       { n: 'Campana', t: 'campana' },
+      { n: 'ID_Cosecha', t: 'select', fuente: '@cosechasSinVender', valor: 'ID', texto: '_texto', etiqueta: '¿De qué cosecha? (opcional: llena lote y kilos)',
+        rellena: c => ({ Lote: c.Lote, Unidad: 'Kg', Cantidad: Math.round(kgNetosCosecha(c)) }) },
       { n: 'Lote', t: 'select', fuente: 'Lotes', valor: 'ID_Lote', texto: 'Nombre', req: true },
       { n: 'Comprador', t: 'select', fuente: 'Compradores', valor: 'ID_Comprador', texto: 'Nombre', req: true },
       { n: 'Unidad', t: 'opciones', opciones: ['Kg', 'Jaba'], def: 'Kg', req: true, etiqueta: 'Vende por' },
@@ -120,7 +124,7 @@ const FORMULARIOS = [
     total: f => num(f.Cantidad) * num(f.Precio_Unitario)
   },
   {
-    id: 'cobro', titulo: 'Cobro / adelanto', icono: '💰', tabla: 'Cobros', prefijo: 'CB',
+    id: 'cobro', grupo: 'plata', titulo: 'Cobro / adelanto', icono: '💰', tabla: 'Cobros', prefijo: 'CB',
     campos: [
       { n: 'Fecha', t: 'fecha', req: true },
       { n: 'Comprador', t: 'select', fuente: 'Compradores', valor: 'ID_Comprador', texto: 'Nombre', req: true },
@@ -129,6 +133,80 @@ const FORMULARIOS = [
       { n: 'Medio_Pago', t: 'opciones', opciones: ['Efectivo', 'Transferencia', 'Yape/Plin', 'Cheque'], etiqueta: 'Medio de pago' },
       { n: 'ID_Venta', t: 'select', fuente: '@ventasDelComprador', valor: 'ID_Venta', texto: '_texto', etiqueta: 'Venta (opcional)' },
       { n: 'Observaciones', t: 'nota' }
+    ]
+  },
+  {
+    id: 'riego', grupo: 'campo', titulo: 'Riego', icono: '💧', tabla: 'Riego', prefijo: 'RG',
+    ayuda: 'Si no sabes los m³, basta con las horas. El pago del regador va en Jornal y el costo del turno en Gasto.',
+    campos: [
+      { n: 'Fecha', t: 'fecha', req: true },
+      { n: 'Campana', t: 'campana' },
+      { n: 'Lote', t: 'select', fuente: 'Lotes', valor: 'ID_Lote', texto: 'Nombre', req: true },
+      { n: 'Horas', t: 'num', req: f => !f.M3, etiqueta: 'Horas de riego' },
+      { n: 'M3', t: 'num', etiqueta: 'Metros cúbicos (m³), si los sabes' },
+      { n: 'Observaciones', t: 'nota' }
+    ]
+  },
+  {
+    id: 'cosecha', grupo: 'campo', titulo: 'Cosecha', icono: '🧺', tabla: 'Cosecha', prefijo: 'CS',
+    ayuda: 'Lo que salió del lote. La venta se registra aparte (y puede tomar estos kilos).',
+    campos: [
+      { n: 'Fecha', t: 'fecha', req: true },
+      { n: 'Campana', t: 'campana' },
+      { n: 'Lote', t: 'select', fuente: 'Lotes', valor: 'ID_Lote', texto: 'Nombre', req: true },
+      { n: 'Unidad', t: 'opciones', opciones: ['Jaba', 'Kg'], def: 'Jaba', req: true, etiqueta: 'Se contó en' },
+      { n: 'Cantidad', t: 'num', req: true, etiqueta: f => f.Unidad === 'Kg' ? 'Kilos cosechados' : 'Jabas cosechadas' },
+      { n: 'Kg_por_Jaba', t: 'num', etiqueta: 'Kilos por jaba (aprox.)', si: f => f.Unidad === 'Jaba', req: f => f.Unidad === 'Jaba' },
+      { n: 'Kg_Descarte', t: 'num', etiqueta: 'Kilos de descarte en campo' },
+      { n: 'Causa_Descarte', t: 'opciones', opciones: ['Mosca de la fruta', 'Antracnosis', 'Quemado de sol', 'Golpes', 'Tamaño chico', 'Otra'], etiqueta: 'Causa principal del descarte',
+        si: f => num(f.Kg_Descarte) > 0, req: f => num(f.Kg_Descarte) > 0 },
+      { n: 'Foto', t: 'foto' },
+      { n: 'Observaciones', t: 'nota' }
+    ],
+    total: f => kgNetosCosecha(f), totalEtiqueta: 'Kilos buenos', totalFmt: v => num(v).toLocaleString('es-PE') + ' kg'
+  },
+  {
+    id: 'floracion', grupo: 'evaluacion', titulo: 'Floración', icono: '🌼', tabla: 'Floracion', prefijo: 'FL',
+    ayuda: 'Una vez por semana en temporada, por lote. Un cálculo a ojo está bien.',
+    campos: [
+      { n: 'Fecha', t: 'fecha', req: true },
+      { n: 'Campana', t: 'campana' },
+      { n: 'Lote', t: 'select', fuente: 'Lotes', valor: 'ID_Lote', texto: 'Nombre', req: true },
+      { n: 'Etapa', t: 'opciones', opciones: ['Inducción', 'Brotación floral', 'Floración', 'Cuajado', 'Llenado de fruto'], req: true },
+      { n: 'Pct_Plantas', t: 'opciones', opciones: ['10', '25', '50', '75', '90', '100'], etiqueta: '% de plantas con flor (aprox.)',
+        si: f => ['Brotación floral', 'Floración'].includes(f.Etapa), req: f => ['Brotación floral', 'Floración'].includes(f.Etapa) },
+      { n: 'Cuajado', t: 'opciones', opciones: ['Poco', 'Normal', 'Mucho'], etiqueta: '¿Cuánto fruto quedó?', si: f => ['Cuajado', 'Llenado de fruto'].includes(f.Etapa) },
+      { n: 'Foto', t: 'foto' },
+      { n: 'Observaciones', t: 'nota' }
+    ]
+  },
+  {
+    id: 'sanidad', grupo: 'evaluacion', titulo: 'Plagas y enfermedades', icono: '🐛', tabla: 'Sanidad', prefijo: 'SN',
+    ayuda: 'Lo que se VE en el campo. Lo que se aplica va en "Aplicación de insumo".',
+    campos: [
+      { n: 'Fecha', t: 'fecha', req: true },
+      { n: 'Campana', t: 'campana' },
+      { n: 'Lote', t: 'select', fuente: 'Lotes', valor: 'ID_Lote', texto: 'Nombre', req: true },
+      { n: 'Plaga', t: 'opciones', opciones: ['Mosca de la fruta', 'Trips', 'Oídio', 'Antracnosis', 'Queresa', 'Otra'], req: true },
+      { n: 'Trampas', t: 'num', etiqueta: 'Trampas revisadas', si: f => f.Plaga === 'Mosca de la fruta', req: f => f.Plaga === 'Mosca de la fruta' },
+      { n: 'Capturas', t: 'num', etiqueta: 'Moscas capturadas (total)', si: f => f.Plaga === 'Mosca de la fruta', req: f => f.Plaga === 'Mosca de la fruta' },
+      { n: 'Dias_Exposicion', t: 'num', def: 7, etiqueta: 'Días desde la última revisión', si: f => f.Plaga === 'Mosca de la fruta' },
+      { n: 'Pct_Afectado', t: 'num', etiqueta: '% de plantas afectadas (aprox.)', si: f => f.Plaga && f.Plaga !== 'Mosca de la fruta' },
+      { n: 'Nivel', t: 'opciones', opciones: ['Bajo', 'Medio', 'Alto'], req: true, etiqueta: '¿Cómo lo ves?' },
+      { n: 'Foto', t: 'foto' },
+      { n: 'Observaciones', t: 'nota' }
+    ]
+  },
+  {
+    id: 'analisis', titulo: 'Análisis de suelo / foliar', icono: '🧾', tabla: 'Analisis', prefijo: 'AN', menu: 'mas',
+    campos: [
+      { n: 'Fecha', t: 'fecha', req: true },
+      { n: 'Campana', t: 'campana' },
+      { n: 'Lote', t: 'select', fuente: 'Lotes', valor: 'ID_Lote', texto: 'Nombre', req: true },
+      { n: 'Tipo', t: 'opciones', opciones: ['Suelo', 'Foliar', 'Agua'], req: true },
+      { n: 'Laboratorio', t: 'texto' },
+      { n: 'Resumen', t: 'nota', etiqueta: 'Resultado principal (ej. pH 7.8, falta potasio)' },
+      { n: 'Foto', t: 'foto', etiqueta: 'Foto del resultado' }
     ]
   },
   {
@@ -185,6 +263,12 @@ const FORMULARIOS = [
 ];
 
 function num(v) { const n = parseFloat(String(v ?? '').replace(',', '.')); return isNaN(n) ? 0 : n; }
+
+/** Kilos buenos de una cosecha: cosechado − descarte en campo. */
+function kgNetosCosecha(c) {
+  const kg = c.Unidad === 'Kg' ? num(c.Cantidad) : num(c.Cantidad) * num(c.Kg_por_Jaba);
+  return Math.max(0, kg - num(c.Kg_Descarte));
+}
 
 function unidadDe(idProducto, solo) {
   const p = (Datos.catalogo('Productos') || []).find(r => r.ID_Producto === idProducto);

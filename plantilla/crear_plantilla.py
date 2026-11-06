@@ -212,7 +212,7 @@ dv_list(cos,"Proveedor",rng(prov,"ID_Proveedor")); dv_list(cos,"Tipo_Comprobante
 money(cos, ["Monto"])
 
 ve = table("Ventas",
-    ["ID_Venta","Fecha","Campana","Lote","Comprador","Unidad","Cantidad","Kg_por_Jaba","Kg_Totales","Kg_Descarte","Precio_Unitario","Total","Tipo_Comprobante","N_Comprobante","Foto_Comprobante","Observaciones"],
+    ["ID_Venta","Fecha","Campana","Lote","Comprador","Unidad","Cantidad","Kg_por_Jaba","Kg_Totales","Kg_Descarte","Precio_Unitario","Total","Tipo_Comprobante","N_Comprobante","Foto_Comprobante","Observaciones","ID_Cosecha"],
     [["EJ-0001",d(2026,11,4),"2026-2027","KENT","C001","Jaba",100,22,
       '=IF(F2="Kg",G2,G2*H2)',0,25,"=G2*K2","Factura","","","Precio por jaba"]],
     calc=("Kg_Totales","Total"), widths={"Observaciones":26})
@@ -227,6 +227,22 @@ cob = table("Cobros",
 dv_list(cob,"Comprador",rng(comp,"ID_Comprador")); dv_list(cob,"ID_Venta",rng(ve,"ID_Venta"))
 dv_list(cob,"Tipo",'"Adelanto,Pago parcial,Liquidación final"'); dv_list(cob,"Medio_Pago",'"Efectivo,Transferencia,Yape/Plin,Cheque"')
 money(cob, ["Monto"])
+
+# ---------------- CAMPO: cosecha, floración, riego, sanidad, análisis ----------------
+cose = table("Cosecha", ["ID","Fecha","Campana","Lote","Unidad","Cantidad","Kg_por_Jaba","Kg_Cosechados","Kg_Descarte","Causa_Descarte","Foto","Observaciones"],
+    [["EJ-0001",d(2026,11,3),"2026-2027","KENT","Jaba",120,22,'=IF(E2="Jaba",F2*G2,F2)',150,"Mosca de la fruta","",""]], calc=("Kg_Cosechados",))
+dv_list(cose,"Campana",CAMP); dv_list(cose,"Lote",LOT); dv_list(cose,"Unidad",'"Kg,Jaba"')
+dv_list(cose,"Causa_Descarte",'"Mosca de la fruta,Antracnosis,Quemado de sol,Golpes,Tamaño chico,Otra"')
+flo = table("Floracion", ["ID","Fecha","Campana","Lote","Etapa","Pct_Plantas","Cuajado","Foto","Observaciones"],
+    [["EJ-0001",d(2026,7,15),"2026-2027","KENT","Floración",60,"","",""]])
+dv_list(flo,"Campana",CAMP); dv_list(flo,"Lote",LOT); dv_list(flo,"Etapa",'"Inducción,Brotación floral,Floración,Cuajado,Llenado de fruto"'); dv_list(flo,"Cuajado",'"Poco,Normal,Mucho"')
+rie = table("Riego", ["ID","Fecha","Campana","Lote","Horas","M3","Observaciones"], [["EJ-0001",d(2026,11,1),"2026-2027","KENT",6,"",""]])
+dv_list(rie,"Campana",CAMP); dv_list(rie,"Lote",LOT)
+san = table("Sanidad", ["ID","Fecha","Campana","Lote","Plaga","Trampas","Capturas","Dias_Exposicion","MTD","Pct_Afectado","Nivel","Foto","Observaciones"],
+    [["EJ-0001",d(2026,11,1),"2026-2027","KENT","Mosca de la fruta",4,6,7,'=IF(AND(F2>0,H2>0),G2/(F2*H2),"")',"","Bajo","",""]], calc=("MTD",))
+dv_list(san,"Campana",CAMP); dv_list(san,"Lote",LOT); dv_list(san,"Plaga",'"Mosca de la fruta,Trips,Oídio,Antracnosis,Queresa,Otra"'); dv_list(san,"Nivel",'"Bajo,Medio,Alto"')
+ana = table("Analisis", ["ID","Fecha","Campana","Lote","Tipo","Laboratorio","Resumen","Foto"], [["EJ-0001",d(2026,4,20),"2026-2027","KENT","Suelo","(EJEMPLO)","pH 7.8, materia orgánica baja",""]], widths={"Resumen":40})
+dv_list(ana,"Campana",CAMP); dv_list(ana,"Lote",LOT); dv_list(ana,"Tipo",'"Suelo,Foliar,Agua"')
 
 # ---------------- CLIMA ----------------
 CLC = ["Fecha","T_Max_C","T_Min_C","T_Prom_C","Lluvia_mm","Humedad_Prom_pct","ET0_mm","Viento_Max_kmh","Fuente"]
@@ -365,9 +381,9 @@ for i,(t,s) in enumerate(txt,1):
 # Order
 order = ["LEEME","Resumen","Lotes","Campanas","Trabajadores","Productos","Proveedores","Compradores",
          "Planilla","Bitacora_Labores","Compras_Insumos","Aplicaciones","Plan_Fertilizacion","Costos","Ventas","Cobros",
-         "Clima_Hoy","Clima","Catalogo_Labores","Categorias_Costo"]
+         "Cosecha","Floracion","Riego","Sanidad","Analisis","Clima_Hoy","Clima","Catalogo_Labores","Categorias_Costo"]
 wb._sheets = [wb[n] for n in order]
-for n in ["Planilla","Bitacora_Labores","Compras_Insumos","Aplicaciones","Plan_Fertilizacion","Costos","Ventas","Cobros"]:
+for n in ["Planilla","Bitacora_Labores","Compras_Insumos","Aplicaciones","Plan_Fertilizacion","Costos","Ventas","Cobros","Cosecha","Floracion","Riego","Sanidad","Analisis"]:
     wb[n].sheet_properties.tabColor = "1565C0"
 for n in ["Lotes","Campanas","Trabajadores","Productos","Proveedores","Compradores","Catalogo_Labores","Categorias_Costo"]:
     wb[n].sheet_properties.tabColor = "2E7D32"

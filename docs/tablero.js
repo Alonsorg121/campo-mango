@@ -195,6 +195,18 @@ function alertas() {
       if (aplicado < num(p.Cantidad_Programada)) out.push({ nivel: 'serio', icono: '📅', txt: `Atrasado: ${nombreDe('Productos', 'ID_Producto', 'Nombre', p.Producto)} en ${nombreDe('Lotes', 'ID_Lote', 'Nombre', p.Lote)} (${p.Mes_Programado}: ${aplicado} de ${num(p.Cantidad_Programada)})` });
     });
   }
+  // sanidad: último nivel ALTO (últimos 14 días) por lote y plaga
+  const hace = dias => { const d = new Date(hoy() + 'T12:00:00'); d.setDate(d.getDate() - dias); return d.toISOString().slice(0, 10); };
+  const ult = {};
+  Tablero.filas('Sanidad').filter(r => fechaISO(r.Fecha) >= hace(14)).sort((a, b) => fechaISO(a.Fecha).localeCompare(fechaISO(b.Fecha)))
+    .forEach(r => { ult[r.Lote + '|' + r.Plaga] = r; });
+  Object.values(ult).filter(r => r.Nivel === 'Alto').forEach(r => out.push({ nivel: 'serio', icono: '🐛', txt: `${r.Plaga} en nivel ALTO en ${nombreDe('Lotes', 'ID_Lote', 'Nombre', r.Lote)} (${fechaBonita(r.Fecha)})` }));
+  // riego: si se usa el módulo, lotes sin riego registrado en 15 días
+  const riegos = Tablero.filas('Riego');
+  if (riegos.length) lotesReales().forEach(l => {
+    const u = riegos.filter(r => r.Lote === l.ID_Lote).map(r => fechaISO(r.Fecha)).sort().pop();
+    if (!u || u < hace(15)) out.push({ nivel: 'aviso', icono: '💧', txt: `${l.Nombre}: sin riego registrado ${u ? 'desde el ' + fechaBonita(u) : 'todavía'}` });
+  });
   return out;
 }
 
@@ -267,14 +279,18 @@ function gLineas(xs, series, o = {}) {
   if (!xs.length) return '<p class="vacio chico">Sin datos de clima para este periodo.</p>';
   const W = ancho(), H = 190, ml = 40, mb = 24, mt = 10, ah = H - mb - mt, aw = W - ml - 10;
   const todos = series.flatMap(s => s.valores).filter(v => v !== null && v !== '' && !isNaN(v));
-  let lo = Math.floor(Math.min(...todos) - 1), hi = Math.ceil(Math.max(...todos) + 1);
+  let lo, hi, ticks;
+  if (o.desdeCero) { const e = escala(Math.max(...todos) || 1); lo = 0; hi = e.max; ticks = e.ticks; }
+  else {
+    lo = Math.floor(Math.min(...todos) - 1); hi = Math.ceil(Math.max(...todos) + 1);
+    const paso = Math.max(1, Math.round((hi - lo) / 4)); ticks = [];
+    for (let t = Math.ceil(lo / paso) * paso; t <= hi; t += paso) ticks.push(t);
+  }
   const x = i => ml + (xs.length === 1 ? aw / 2 : i / (xs.length - 1) * aw), y = v => mt + ah - (v - lo) / ((hi - lo) || 1) * ah;
-  const paso = Math.max(1, Math.round((hi - lo) / 4));
-  const ticks = []; for (let t = Math.ceil(lo / paso) * paso; t <= hi; t += paso) ticks.push(t);
   const etqX = [0, Math.floor((xs.length - 1) / 2), xs.length - 1].filter((v, i, a) => a.indexOf(v) === i);
   const datos = encodeURIComponent(JSON.stringify({ xs, series: series.map(s => ({ n: s.nombre, v: s.valores })), u: o.unidad || '' }));
   return `<svg class="graf lineas" viewBox="0 0 ${W} ${H}" width="100%" data-lineas="${datos}" data-ml="${ml}" data-aw="${aw}" role="img" aria-label="${esc(o.titulo || '')}">
-    ${ticks.map(t => `<line x1="${ml}" x2="${W - 10}" y1="${y(t)}" y2="${y(t)}" stroke="${C.grilla}"/><text x="${ml - 6}" y="${y(t) + 4}" text-anchor="end" class="eje">${t}${o.unidad || ''}</text>`).join('')}
+    ${ticks.map(t => `<line x1="${ml}" x2="${W - 10}" y1="${y(t)}" y2="${y(t)}" stroke="${C.grilla}"/><text x="${ml - 6}" y="${y(t) + 4}" text-anchor="end" class="eje">${+t.toFixed(2)}${o.unidad || ''}</text>`).join('')}
     ${series.map(s => `<path d="${s.valores.map((v, i) => (i && s.valores[i - 1] !== null ? 'L' : 'M') + x(i).toFixed(1) + ',' + y(num(v)).toFixed(1)).join('')}" fill="none" stroke="${s.color}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`).join('')}
     ${etqX.map(i => `<text x="${x(i)}" y="${H - 6}" text-anchor="${i === 0 ? 'start' : i === xs.length - 1 ? 'end' : 'middle'}" class="eje">${esc(fechaCorta(xs[i]))}</text>`).join('')}
     <line class="cruz" x1="0" x2="0" y1="${mt}" y2="${mt + ah}" stroke="${C.muda}" stroke-dasharray="3 3" visibility="hidden"/>
@@ -326,12 +342,13 @@ Vistas.tablero = async (pest) => {
       ${F.periodo === 'rango' ? `<div class="rango"><input type="date" id="f-desde" value="${esc(F.desde || D.R.desde)}"><span>a</span><input type="date" id="f-hasta" value="${esc(F.hasta || D.R.hasta)}"></div>` : ''}
       <div class="chips">${reales.map(l => `<button class="chip ${F.lotes.includes(l.ID_Lote) ? 'sel' : ''}" data-lote="${esc(l.ID_Lote)}"><i style="background:${colorLote(l.ID_Lote)}"></i>${esc(String(l.Nombre || l.ID_Lote).replace(/^Lote /, ''))}</button>`).join('')}
         <button class="chip todos" data-lote="*">${F.lotes.length === reales.length ? 'Ninguno' : 'Todos'}</button></div>
-      ${P !== 'clima' && P !== 'caja' ? `<label class="chk mini-chk"><input type="checkbox" id="f-gen" ${F.generales ? 'checked' : ''}><span>Incluir gastos generales <small class="det">(repartidos por ${D.sinHa ? 'partes iguales' : 'hectárea'})</small></span></label>` : ''}
+      ${!['clima', 'caja', 'campo'].includes(P) ? `<label class="chk mini-chk"><input type="checkbox" id="f-gen" ${F.generales ? 'checked' : ''}><span>Incluir gastos generales <small class="det">(repartidos por ${D.sinHa ? 'partes iguales' : 'hectárea'})</small></span></label>` : ''}
     </div>`;
-  const tabs = `<div class="tabs">${[['resumen', '📊 Resumen'], ['costos', '💸 Costos'], ['ventas', '🥭 Ventas'], ['caja', '📆 Mes a mes'], ['clima', '🌤️ Clima']].map(([k, t]) => `<a class="${P === k ? 'sel' : ''}" href="#/tablero/${k}">${t}</a>`).join('')}</div>`;
+  const tabs = `<div class="tabs">${[['resumen', '📊 Resumen'], ['campo', '🌱 Campo'], ['costos', '💸 Costos'], ['ventas', '🥭 Ventas'], ['caja', '📆 Mes a mes'], ['clima', '🌤️ Clima']].map(([k, t]) => `<a class="${P === k ? 'sel' : ''}" href="#/tablero/${k}">${t}</a>`).join('')}</div>`;
 
   let cuerpo = '';
   if (P === 'resumen') cuerpo = pestResumen(D, F);
+  if (P === 'campo') cuerpo = pestCampo(D, F);
   if (P === 'costos') cuerpo = pestCostos(D);
   if (P === 'ventas') cuerpo = pestVentas(D);
   if (P === 'caja') cuerpo = pestCaja(D);
@@ -408,6 +425,79 @@ function aItems(obj, color, n = 8) {
   if (xs.length > n) { const resto = xs.splice(n - 1); xs.push({ label: 'Otros', value: resto.reduce((s, x) => s + x.value, 0) }); }
   return xs.map(x => Object.assign(x, { color }));
 }
+function pestCampo(D, F) {
+  const sel = new Set(F.lotes);
+  const enR = r => { const f = fechaISO(r.Fecha); return f >= D.R.desde && f <= D.R.hasta && sel.has(r.Lote) && (!r.Campana || !D.R.porCampana || r.Campana === F.campana); };
+  const reales = lotesReales().filter(l => sel.has(l.ID_Lote));
+  const nom = id => String(nombreDe('Lotes', 'ID_Lote', 'Nombre', id)).replace(/^Lote /, '');
+  // --- Cosecha
+  const cos = Tablero.filas('Cosecha').filter(enR);
+  const bruto = r => r.Unidad === 'Kg' ? num(r.Cantidad) : num(r.Cantidad) * num(r.Kg_por_Jaba);
+  const pl = reales.map(l => {
+    const cs = cos.filter(r => r.Lote === l.ID_Lote);
+    const b = cs.reduce((s, r) => s + bruto(r), 0), d = cs.reduce((s, r) => s + num(r.Kg_Descarte), 0);
+    const ha = num(l.Hectareas); const v = (D.porLote.find(x => x.id === l.ID_Lote) || {}).kg || 0;
+    return { id: l.ID_Lote, nombre: nom(l.ID_Lote), b, d, neto: b - d, vendido: v, ha, kgHa: ha ? b / ha : 0 };
+  });
+  const tb = pl.reduce((s, x) => s + x.b, 0), td = pl.reduce((s, x) => s + x.d, 0), tv = pl.reduce((s, x) => s + x.vendido, 0), tha = pl.reduce((s, x) => s + x.ha, 0);
+  const causas = {}; cos.forEach(r => { if (num(r.Kg_Descarte)) causas[r.Causa_Descarte || 'Sin causa'] = (causas[r.Causa_Descarte || 'Sin causa'] || 0) + num(r.Kg_Descarte); });
+  const sinHa = tha <= 0;
+  // --- Floración: último registro por lote
+  const flo = Tablero.filas('Floracion').filter(enR).sort((a, b) => fechaISO(a.Fecha).localeCompare(fechaISO(b.Fecha)));
+  const ultFlo = {}; flo.forEach(r => { ultFlo[r.Lote] = r; });
+  const maxFlo = {}; flo.forEach(r => { if (num(r.Pct_Plantas) >= num((maxFlo[r.Lote] || {}).Pct_Plantas)) maxFlo[r.Lote] = r; });
+  // --- Riego
+  const rie = Tablero.filas('Riego').filter(enR);
+  const et0 = Tablero.filas('Clima').filter(r => { const f = fechaISO(r.Fecha); return f >= D.R.desde && f <= D.R.hasta; }).reduce((s, r) => s + num(r.ET0_mm), 0);
+  const pr = reales.map(l => {
+    const rs = rie.filter(r => r.Lote === l.ID_Lote); const m3 = rs.reduce((s, r) => s + num(r.M3), 0); const ha = num(l.Hectareas);
+    return { id: l.ID_Lote, nombre: nom(l.ID_Lote), horas: rs.reduce((s, r) => s + num(r.Horas), 0), m3, riegos: rs.length, mm: ha && m3 ? m3 / (ha * 10) : 0, ultimo: rs.map(r => fechaISO(r.Fecha)).sort().pop() };
+  });
+  const hayM3 = pr.some(x => x.mm > 0);
+  // --- Sanidad: MTD semanal de mosca
+  const san = Tablero.filas('Sanidad').filter(enR).sort((a, b) => fechaISO(a.Fecha).localeCompare(fechaISO(b.Fecha)));
+  const sem = {};
+  san.filter(r => r.Plaga === 'Mosca de la fruta' && num(r.Trampas) > 0 && num(r.Dias_Exposicion) > 0).forEach(r => {
+    const f = new Date(fechaISO(r.Fecha) + 'T12:00:00'); f.setDate(f.getDate() - ((f.getDay() + 6) % 7)); const k = f.toISOString().slice(0, 10);
+    const a = sem[k] = sem[k] || { cap: 0, td: 0 }; a.cap += num(r.Capturas); a.td += num(r.Trampas) * num(r.Dias_Exposicion);
+  });
+  const semanas = Object.keys(sem).sort(); const mtd = semanas.map(k => +(sem[k].cap / sem[k].td).toFixed(2));
+  const ultSan = {}; san.forEach(r => { ultSan[r.Lote + '|' + r.Plaga] = r; });
+  const filasSan = Object.values(ultSan).sort((a, b) => ({ Alto: 0, Medio: 1, Bajo: 2 }[a.Nivel] ?? 3) - ({ Alto: 0, Medio: 1, Bajo: 2 }[b.Nivel] ?? 3));
+  // --- Análisis
+  const ana = Tablero.filas('Analisis').filter(r => sel.has(r.Lote)).sort((a, b) => fechaISO(b.Fecha).localeCompare(fechaISO(a.Fecha)));
+  const ultAna = {}; ana.forEach(r => { const k = r.Lote + '|' + r.Tipo; if (!ultAna[k]) ultAna[k] = r; });
+
+  return `
+    <div class="kpis">
+      ${kpi('Kg cosechados', fmtN(tb), sinHa ? 'llena hectáreas en Lotes' : fmtN(tha ? tb / tha : 0) + ' kg/ha')}
+      ${kpi('Descarte en campo', tb ? (td / tb * 100).toFixed(1) + '%' : '—', fmtN(td) + ' kg', td / (tb || 1) > 0.1 ? 'mal' : '')}
+      ${kpi('Kg vendidos', fmtN(tv), tb ? (tv / tb * 100).toFixed(0) + '% de lo cosechado' : '')}
+      ${kpi('Sin vender o merma', fmtN(Math.max(0, tb - td - tv)) + ' kg', 'kilos buenos que no figuran en ventas')}
+    </div>
+    ${bloque('rend-cos', 'Rendimiento real por lote', sinHa ? 'Kilos cosechados (llena hectáreas para ver kg/ha).' : 'Kilos cosechados por hectárea.',
+      gBarrasH(pl.map(x => ({ label: x.nombre, value: sinHa ? x.b : x.kgHa, color: colorLote(x.id), tip: `${x.nombre}: ${fmtN(x.b)} kg cosechados · ${fmtN(x.d)} kg descarte · ${fmtN(x.vendido)} kg vendidos` })), { fmt: v => fmtN(v) + (sinHa ? ' kg' : ' kg/ha') }),
+      tablaHTML(['Lote', 'Cosechado', 'Descarte', '% desc.', 'Vendido', 'Kg/ha'], pl.map(x => [x.nombre, fmtN(x.b), fmtN(x.d), x.b ? (x.d / x.b * 100).toFixed(1) + '%' : '—', fmtN(x.vendido), x.ha ? fmtN(x.kgHa) : '—'])))}
+    ${bloque('causas', '¿Por qué se pierde fruta?', 'Kilos de descarte en campo según su causa.', gBarrasH(aItems(causas, C.serie1).map(x => Object.assign(x, { tip: `${x.label}: ${fmtN(x.value)} kg (${td ? (x.value / td * 100).toFixed(0) : 0}%)` })), { fmt: v => fmtN(v) + ' kg' }),
+      tablaHTML(['Causa', 'Kg', '%'], aItems(causas, '', 99).map(x => [x.label, fmtN(x.value), td ? (x.value / td * 100).toFixed(1) + '%' : '—'])))}
+    ${bloque('flor', 'Floración por lote', 'Mayor % de plantas con flor registrado en el periodo.',
+      gBarrasH(reales.filter(l => maxFlo[l.ID_Lote]).map(l => { const r = maxFlo[l.ID_Lote], u = ultFlo[l.ID_Lote]; return { label: nom(l.ID_Lote), value: num(r.Pct_Plantas), color: colorLote(l.ID_Lote), tip: `${nom(l.ID_Lote)}: ${num(r.Pct_Plantas)}% el ${fechaBonita(r.Fecha)} · ahora: ${u.Etapa}${u.Cuajado ? ' (cuajado ' + u.Cuajado + ')' : ''}` }; }), { fmt: v => v + '%' }),
+      tablaHTML(['Lote', 'Etapa actual', 'Desde', '% flor máx.', 'Cuajado'], reales.filter(l => ultFlo[l.ID_Lote]).map(l => { const u = ultFlo[l.ID_Lote]; return [nom(l.ID_Lote), u.Etapa, fechaBonita(u.Fecha), maxFlo[l.ID_Lote] ? num(maxFlo[l.ID_Lote].Pct_Plantas) + '%' : '—', u.Cuajado || '—']; })))}
+    ${bloque('riego', hayM3 ? 'Agua aplicada por lote' : 'Horas de riego por lote',
+      (hayM3 ? 'Lámina de agua en mm (m³ ÷ hectáreas ÷ 10). ' : 'Registra los m³ para comparar en mm. ') + `Referencia: la ET0 del periodo fue <b>${fmtN(et0, 0)} mm</b>.`,
+      (hayM3 && pr.some(x => x.riegos && !x.mm) ? `<div class="det">Sin m³ registrados (solo horas): ${pr.filter(x => x.riegos && !x.mm).map(x => x.nombre).join(', ')}.</div>` : '') +
+      gBarrasH(pr.filter(x => x.riegos && (!hayM3 || x.mm)).map(x => ({ label: x.nombre, value: hayM3 ? x.mm : x.horas, color: colorLote(x.id), tip: `${x.nombre}: ${x.riegos} riegos · ${fmtN(x.horas, 1)} h${x.m3 ? ' · ' + fmtN(x.m3) + ' m³' : ''} · último ${fechaBonita(x.ultimo)}` })), { fmt: v => fmtN(v, hayM3 ? 0 : 1) + (hayM3 ? ' mm' : ' h') }),
+      tablaHTML(['Lote', 'Riegos', 'Horas', 'm³', 'mm', 'Último'], pr.map(x => [x.nombre, x.riegos, fmtN(x.horas, 1), x.m3 ? fmtN(x.m3) : '—', x.mm ? fmtN(x.mm, 0) : '—', x.ultimo ? fechaBonita(x.ultimo) : '—'])))}
+    ${bloque('mosca', 'Mosca de la fruta', 'Moscas por trampa por día (MTD), promedio semanal de los lotes elegidos.',
+      gLineas(semanas, [{ nombre: 'MTD', color: C.serie1, valores: mtd }], { unidad: '', desdeCero: true }),
+      tablaHTML(['Semana del', 'MTD'], semanas.map((k, i) => [fechaBonita(k), mtd[i]])))}
+    <section class="tarjeta"><h3>Estado sanitario por lote</h3><div class="det">Última evaluación de cada plaga.</div>
+      ${filasSan.length ? tablaHTML(['Lote', 'Plaga', 'Nivel', 'Fecha', 'Detalle'], filasSan.map(r => [nom(r.Lote), r.Plaga, (r.Nivel === 'Alto' ? '🔴 ' : r.Nivel === 'Medio' ? '🟠 ' : '🟢 ') + r.Nivel, fechaBonita(r.Fecha), r.Plaga === 'Mosca de la fruta' && num(r.Trampas) ? 'MTD ' + (num(r.Capturas) / (num(r.Trampas) * num(r.Dias_Exposicion || 7))).toFixed(2) : (r.Pct_Afectado ? r.Pct_Afectado + '% afectado' : '')])) : '<p class="vacio chico">Sin evaluaciones en este periodo.</p>'}</section>
+    <section class="tarjeta"><h3>Análisis de suelo y foliar</h3><div class="det">El más reciente de cada lote.</div>
+      ${Object.values(ultAna).length ? Object.values(ultAna).map(r => `<div class="kv"><span>${esc(nom(r.Lote))} · ${esc(r.Tipo)} · ${fechaBonita(r.Fecha)}</span><span>${esc(r.Resumen || '')} ${r.Foto && String(r.Foto).startsWith('http') ? `<a href="${esc(r.Foto)}" target="_blank" rel="noopener">Ver foto</a>` : ''}</span></div>`).join('') : '<p class="vacio chico">Sin análisis registrados.</p>'}</section>
+  `;
+}
+
 function pestCostos(D) {
   const tot = Object.values(D.categorias).reduce((s, v) => s + v, 0);
   const cat = aItems(D.categorias, C.serie1).map(x => Object.assign(x, { tip: `${x.label}: ${fmtS(x.value)} (${tot ? (x.value / tot * 100).toFixed(0) : 0}%)` }));

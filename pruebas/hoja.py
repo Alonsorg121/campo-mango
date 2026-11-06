@@ -26,8 +26,10 @@ def recalcular(xlsx, estado, out):
     shutil.copy(xlsx, f)
     wb = load_workbook(f)
     for nombre, filas in est.items():
-        if nombre not in wb.sheetnames or nombre in ('LEEME',):
+        if nombre in ('LEEME',):
             continue
+        if nombre not in wb.sheetnames:
+            wb.create_sheet(nombre)
         ws = wb[nombre]
         if nombre == 'Resumen':
             continue

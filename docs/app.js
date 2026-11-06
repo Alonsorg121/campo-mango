@@ -226,12 +226,14 @@ Vistas.inicio = () => {
   const clima = c ? `<a class="clima-mini" href="#/clima">
       <div class="clima-t">${Math.round(num(c.T_Max_C))}° <small>/ ${Math.round(num(c.T_Min_C))}°</small></div>
       <div>Hoy · lluvia ${num(c.Lluvia_mm).toFixed(1)} mm · ET0 ${num(c.ET0_mm).toFixed(1)} mm</div></a>` : '';
-  const principales = FORMULARIOS.filter(f => !f.menu);
+  const grupo = (g, titulo) => { const fs = FORMULARIOS.filter(f => f.grupo === g); return fs.length ? `<h2 class="sec">${titulo}</h2>
+    <div class="grid">${fs.map(f => `<a class="btn-grande" href="#/form/${f.id}"><span class="ico">${f.icono}</span>${esc(f.titulo)}</a>`).join('')}</div>` : ''; };
   const pendientePago = (Datos.srv && Datos.srv.planillaPendiente || []).length;
   UI.pintar(`
     ${clima}
-    <h2 class="sec">Registrar</h2>
-    <div class="grid">${principales.map(f => `<a class="btn-grande" href="#/form/${f.id}"><span class="ico">${f.icono}</span>${esc(f.titulo)}</a>`).join('')}</div>
+    ${grupo('campo', '🌱 Campo')}
+    ${grupo('evaluacion', '🔍 Evaluaciones')}
+    ${grupo('plata', '💰 Plata')}
     <h2 class="sec">Consultar</h2>
     <div class="grid">
       <a class="btn-grande sec2 destacado" href="#/tablero"><span class="ico">📈</span>Tablero y reportes</a>
@@ -268,6 +270,11 @@ Vistas.form = (id) => {
       return Datos.recientes('Ventas').filter(r => r.Comprador === v.Comprador)
         .map(r => ({ v: r.ID_Venta, t: `${fechaBonita(r.Fecha)} · ${r.Cantidad} ${r.Unidad} · ${soles(num(r.Cantidad) * num(r.Precio_Unitario))}` }));
     }
+    if (c.fuente === '@cosechasSinVender') {
+      const usadas = new Set(Datos.recientes('Ventas').map(r => r.ID_Cosecha).filter(Boolean));
+      return Datos.recientes('Cosecha').filter(r => !usadas.has(r.ID) || r.ID === v.ID_Cosecha).slice(-15).reverse()
+        .map(r => ({ v: r.ID, t: `${fechaBonita(r.Fecha)} · ${nombreDe('Lotes', 'ID_Lote', 'Nombre', r.Lote)} · ${Math.round(kgNetosCosecha(r)).toLocaleString('es-PE')} kg` }));
+    }
     return Datos.catalogo(c.fuente).filter(c.filtro || (() => true)).map(r => ({ v: r[c.valor], t: r[c.texto] + (r._pendiente ? ' (nuevo)' : '') }));
   };
   const etq = c => (typeof c.etiqueta === 'function' ? c.etiqueta(v) : c.etiqueta) || c.n.replace(/_/g, ' ');
@@ -285,7 +292,7 @@ Vistas.form = (id) => {
       case 'nota': return `<div class="campo">${l}<textarea rows="2" data-n="${c.n}">${esc(val)}</textarea></div>`;
       case 'select': {
         const ops = opcionesDe(c);
-        if (!ops.length && c.fuente !== '@ventasDelComprador') return `<div class="campo">${l}<div class="aviso">No hay datos en ${esc(c.fuente)}. Sincroniza o agrégalos en "Más".</div></div>`;
+        if (!ops.length && !String(c.fuente).startsWith('@')) return `<div class="campo">${l}<div class="aviso">No hay datos en ${esc(c.fuente)}. Sincroniza o agrégalos en "Más".</div></div>`;
         return `<div class="campo">${l}<select data-n="${c.n}"><option value="">— Elegir —</option>${ops.map(o => `<option value="${esc(o.v)}" ${String(o.v) === String(val) ? 'selected' : ''}>${esc(o.t)}</option>`).join('')}</select></div>`;
       }
       case 'multi': {
@@ -299,7 +306,8 @@ Vistas.form = (id) => {
   }
 
   function render() {
-    const tot = F.total ? `<div class="total">${esc(F.totalEtiqueta || 'Total')}: <b>${soles(F.total(v))}</b></div>` : '';
+    const fmtTot = F.totalFmt || soles;
+    const tot = F.total ? `<div class="total">${esc(F.totalEtiqueta || 'Total')}: <b>${fmtTot(F.total(v))}</b></div>` : '';
     UI.pintar(`
       <form id="frm" class="frm" autocomplete="off">
         ${F.ayuda ? `<p class="ayuda">${esc(F.ayuda)}</p>` : ''}
@@ -312,15 +320,22 @@ Vistas.form = (id) => {
       const n = e.target.dataset.n; if (!n) return;
       v[n] = e.target.value;
       v['_manual_' + n] = true;
-      if (e.target.tagName === 'SELECT') { aplicarDefDesde(n); render(); return; }
-      const t = $('.total b'); if (t && F.total) t.textContent = soles(F.total(v));
+      if (e.target.tagName === 'SELECT') {
+        const campo = F.campos.find(c => c.n === n);
+        if (campo && campo.rellena && v[n]) {
+          const r = campo.fuente === '@cosechasSinVender' ? Datos.recientes('Cosecha').find(x => x.ID === v[n]) : null;
+          if (r) Object.assign(v, campo.rellena(r, v));
+        }
+        aplicarDefDesde(n); render(); return;
+      }
+      const t = $('.total b'); if (t && F.total) t.textContent = (F.totalFmt || soles)(F.total(v));
     });
     frm.addEventListener('change', e => {
       const m = e.target.dataset.multi;
       if (m) {
         v[m] = [...frm.querySelectorAll(`[data-multi="${m}"]:checked`)].map(x => x.value);
         aplicarDefDesde(m);
-        const t = $('.total b'); if (t && F.total) t.textContent = soles(F.total(v));
+        const t = $('.total b'); if (t && F.total) t.textContent = (F.totalFmt || soles)(F.total(v));
         const tar = frm.querySelector('[data-n="Tarifa"]'); if (tar && v.Tarifa !== undefined) tar.value = v.Tarifa;
       }
     });
@@ -507,6 +522,11 @@ Vistas.historial = (tabla) => {
       case 'Costos': return `${esc(r.Categoria)} · ${esc(r.Concepto)} · ${soles(r.Monto)}`;
       case 'Cobros': return `${esc(nombreDe('Compradores', 'ID_Comprador', 'Nombre', r.Comprador))} · ${esc(r.Tipo)} · ${soles(r.Monto)}`;
       case 'Bitacora_Labores': return `${esc(r.Labor)} · ${esc(r.Detalle || '')}`;
+      case 'Cosecha': return `${r.Cantidad} ${esc(r.Unidad === 'Kg' ? 'kg' : 'jabas')} · ${Math.round(kgNetosCosecha(r)).toLocaleString('es-PE')} kg buenos${num(r.Kg_Descarte) ? ' · descarte ' + r.Kg_Descarte + ' kg (' + esc(r.Causa_Descarte || '') + ')' : ''}`;
+      case 'Riego': return `${r.Horas ? r.Horas + ' h' : ''}${r.M3 ? ' · ' + r.M3 + ' m³' : ''}`;
+      case 'Floracion': return `${esc(r.Etapa)}${r.Pct_Plantas ? ' · ' + r.Pct_Plantas + '% con flor' : ''}${r.Cuajado ? ' · cuajado ' + esc(r.Cuajado) : ''}`;
+      case 'Sanidad': return `${esc(r.Plaga)} · nivel ${esc(r.Nivel)}${r.Capturas ? ' · ' + r.Capturas + ' moscas en ' + r.Trampas + ' trampas' : ''}${r.Pct_Afectado ? ' · ' + r.Pct_Afectado + '% afectado' : ''}`;
+      case 'Analisis': return `${esc(r.Tipo)} · ${esc(r.Resumen || '')}`;
       case 'Plan_Fertilizacion': return `${esc(nombreDe('Productos', 'ID_Producto', 'Nombre', r.Producto))} · ${esc(r.Fase)} · ${r.Cantidad_Programada}`;
     }
     return esc(JSON.stringify(r));
