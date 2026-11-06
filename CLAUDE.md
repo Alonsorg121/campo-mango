@@ -5,16 +5,16 @@ El usuario principal es una persona mayor que la usa en el celular, a veces sin 
 
 ## Arquitectura (no cambiarla sin motivo)
 ```
-app/ (PWA estática, GitHub Pages)  ──fetch──>  Apps Script Web App (apps-script/Api.gs)  ──>  Google Sheets (BASE DE DATOS)
+docs/ (PWA estática, GitHub Pages)  ──fetch──>  Apps Script Web App (apps-script/Api.gs)  ──>  Google Sheets (BASE DE DATOS)
      IndexedDB: cola offline + copia de datos                                      Clima.gs llena las hojas Clima/Clima_Hoy
 ```
 - **La base de datos es el Google Sheets.** La app no guarda datos permanentes propios: solo una cola de pendientes y una copia de lectura.
 - Sin frameworks ni compilación: HTML, CSS y JS puros. Se edita y se sube tal cual.
 
 ## Archivos
-- `app/forms.js`: **formularios declarativos**. Para agregar o quitar campos, casi siempre basta con tocar este archivo. Los tipos de campo están documentados al inicio.
-- `app/app.js`: almacenamiento (DB), datos y cola (Datos), sincronización (Sync), vistas y rutas `#/...`.
-- `app/sw.js` + `app/version.js`: modo offline. **Sube `APP_VERSION` en cada cambio**; si no, los celulares siguen con la versión anterior.
+- `docs/forms.js`: **formularios declarativos**. Para agregar o quitar campos, casi siempre basta con tocar este archivo. Los tipos de campo están documentados al inicio.
+- `docs/app.js`: almacenamiento (DB), datos y cola (Datos), sincronización (Sync), vistas y rutas `#/...`.
+- `docs/sw.js` + `docs/version.js`: modo offline. **Sube `APP_VERSION` en cada cambio**; si no, los celulares siguen con la versión anterior.
 - `apps-script/Api.gs`: `doGet` (`accion=datos|ping`) y `doPost` (`ops: agregar|editar`). Escribe **por nombre de columna**.
 - `apps-script/Clima.gs`: clima diario de Open-Meteo para la ubicación -4.884565, -80.268667.
 - `plantilla/crear_plantilla.py`: genera el .xlsx base (hojas, encabezados, Resumen y listas).

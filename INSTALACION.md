@@ -31,7 +31,7 @@ Tiempo total: unos 20 minutos, una sola vez.
 4. En el celular: menú del navegador (⋮) > **Agregar a la pantalla de inicio**. Así queda como una app con ícono y funciona sin señal.
 
 ## Actualizar a una versión nueva
-- **App:** se suben los archivos nuevos de `app/` a GitHub y se cambia el número en `app/version.js`. En los celulares aparece el aviso *"Hay una nueva versión · Tocar para actualizar"*. Los registros pendientes no se pierden.
+- **App:** se suben los archivos nuevos de `docs/` a GitHub y se cambia el número en `docs/version.js`. En los celulares aparece el aviso *"Hay una nueva versión · Tocar para actualizar"*. Los registros pendientes no se pierden.
 - **Api.gs:** se pega el código nuevo y luego **Implementar > Gestionar implementaciones > ✏️ > Versión: Nueva versión > Implementar**. La URL no cambia.
 - **Los datos no se tocan en ningún caso**: viven en el Google Sheets.
 
