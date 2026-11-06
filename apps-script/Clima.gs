@@ -13,8 +13,8 @@
  */
 
 // Ubicación del campo (tomada de Google Maps)
-const LAT = -4.884565;
-const LON = -80.268667;
+const LAT = -4.88;   // pon aquí la latitud exacta de tu campo
+const LON = -80.27;  // pon aquí la longitud exacta de tu campo
 
 const FECHA_INICIO_HISTORICO = '2026-04-01'; // inicio de la campaña 2026-2027
 const ZONA = 'America/Lima';

@@ -16,7 +16,7 @@ docs/ (PWA estática, GitHub Pages)  ──fetch──>  Apps Script Web App (ap
 - `docs/app.js`: almacenamiento (DB), datos y cola (Datos), sincronización (Sync), vistas y rutas `#/...`.
 - `docs/sw.js` + `docs/version.js`: modo offline. **Sube `APP_VERSION` en cada cambio**; si no, los celulares siguen con la versión anterior.
 - `apps-script/Api.gs`: `doGet` (`accion=datos|ping`) y `doPost` (`ops: agregar|editar`). Escribe **por nombre de columna**.
-- `apps-script/Clima.gs`: clima diario de Open-Meteo para la ubicación -4.884565, -80.268667.
+- `apps-script/Clima.gs`: clima diario de Open-Meteo para la ubicación del campo (coordenadas aproximadas en el repositorio público; las exactas están solo en el Apps Script del usuario).
 - `plantilla/crear_plantilla.py`: genera el .xlsx base (hojas, encabezados, Resumen y listas).
 - `pruebas/`: servidor que ejecuta el **Api.gs real** contra una copia del Sheets (recalculada con LibreOffice), más pruebas Playwright.
 
