@@ -127,6 +127,7 @@ const Sync = {
       // 2) leer datos actualizados
       const d = await this.get('datos');
       Datos.srv = d; await DB.set('datos', d);
+      if (typeof Tablero !== 'undefined' && Tablero.datos) Tablero.actualizar(true);
       this.ultimoError = '';
       if (!silencioso) UI.toast('Datos sincronizados ✓');
     } catch (e) {
@@ -233,8 +234,8 @@ Vistas.inicio = () => {
     <div class="grid">${principales.map(f => `<a class="btn-grande" href="#/form/${f.id}"><span class="ico">${f.icono}</span>${esc(f.titulo)}</a>`).join('')}</div>
     <h2 class="sec">Consultar</h2>
     <div class="grid">
+      <a class="btn-grande sec2 destacado" href="#/tablero"><span class="ico">📈</span>Tablero y reportes</a>
       <a class="btn-grande sec2" href="#/pagar"><span class="ico">🧾</span>Pagar planilla${pendientePago ? `<span class="badge">${pendientePago}</span>` : ''}</a>
-      <a class="btn-grande sec2" href="#/resumen"><span class="ico">📊</span>Resumen por lote</a>
       <a class="btn-grande sec2" href="#/stock"><span class="ico">📦</span>Stock de insumos</a>
       <a class="btn-grande sec2" href="#/cobrar"><span class="ico">📒</span>Por cobrar</a>
       <a class="btn-grande sec2" href="#/clima"><span class="ico">🌤️</span>Clima</a>
@@ -597,6 +598,7 @@ Vistas.ajustes = () => {
       <div class="kv"><span>PIN de administrador</span><b>${Pin.tiene() ? '✓ activado' : 'sin PIN'}</b></div>
       ${Pin.tiene() ? '' : '<div class="det">Crea un PIN para que nadie más pueda ver la conexión ni copiar el enlace desde este celular.</div>'}
       <button class="mini" id="pin">${Pin.tiene() ? 'Cambiar o quitar PIN' : 'Crear PIN'}</button>
+      ${Pin.tiene() ? `<label class="chk mini-chk"><input type="checkbox" id="pin-tab" ${Datos.config.pinTablero ? 'checked' : ''}> Pedir PIN para ver el Tablero (montos de plata)</label>` : ''}
     </div>`;
   UI.pintar(`
     ${editar ? formConexion : tarjetaConexion}
@@ -629,13 +631,18 @@ Vistas.ajustes = () => {
       if (Pin.tiene() && !(await Pin.verificar('PIN actual'))) return;
       const p1 = await pedirPin(Pin.tiene() ? 'Nuevo PIN (vacío = quitar PIN)' : 'Crea un PIN (4 a 12 números)', 'Siguiente');
       if (p1 === null) return;
-      if (p1 === '' && Pin.tiene()) { delete Datos.config.pinHash; await Datos.guardarConfig(); UI.toast('PIN quitado'); Vistas.ajustes(); return; }
+      if (p1 === '' && Pin.tiene()) { delete Datos.config.pinHash; delete Datos.config.pinTablero; await Datos.guardarConfig(); UI.toast('PIN quitado'); Vistas.ajustes(); return; }
       if (!/^\d{4,12}$/.test(p1)) { UI.toast('El PIN debe tener de 4 a 12 números'); return; }
       const p2 = await pedirPin('Repite el PIN', 'Guardar');
       if (p2 !== p1) { UI.toast('Los PIN no coinciden'); return; }
       Datos.config.pinHash = await Pin.hash(p1); await Datos.guardarConfig();
       Pin.desbloqueadoHasta = 0;
       UI.toast('PIN guardado ✓'); Vistas.ajustes();
+    };
+    const pt = $('#pin-tab');
+    if (pt) pt.onchange = async () => {
+      if (!(await Pin.verificar('PIN para cambiar esta opción'))) { pt.checked = !pt.checked; return; }
+      Datos.config.pinTablero = pt.checked; await Datos.guardarConfig(); UI.toast(pt.checked ? 'El Tablero pedirá PIN ✓' : 'El Tablero ya no pide PIN');
     };
     const camp = $('#camp');
     if (camp) camp.onchange = async () => { Datos.config.campana = camp.value; await Datos.guardarConfig(); UI.toast('Campaña guardada ✓'); };

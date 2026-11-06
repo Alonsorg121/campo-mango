@@ -1,2 +1,2 @@
 // Cambia este número en cada versión nueva de la app (lo usa el modo offline para actualizarse).
-self.APP_VERSION = '1.1.0';
+self.APP_VERSION = '1.2.0';

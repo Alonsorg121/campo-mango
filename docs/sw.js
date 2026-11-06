@@ -1,7 +1,7 @@
 // Modo offline: guarda la app en el celular. Los datos NO pasan por aquí (van directo al Google Sheets).
 importScripts('version.js');
 const CACHE = 'campo-mango-' + self.APP_VERSION;
-const ARCHIVOS = ['./', 'index.html', 'styles.css', 'version.js', 'forms.js', 'app.js', 'manifest.webmanifest', 'icon.svg', 'icon-192.png', 'icon-512.png'];
+const ARCHIVOS = ['./', 'index.html', 'styles.css', 'version.js', 'forms.js', 'app.js', 'tablero.js', 'manifest.webmanifest', 'icon.svg', 'icon-192.png', 'icon-512.png'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(ARCHIVOS)));

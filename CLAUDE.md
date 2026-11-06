@@ -13,6 +13,7 @@ docs/ (PWA estática, GitHub Pages)  ──fetch──>  Apps Script Web App (ap
 
 ## Archivos
 - `docs/forms.js`: **formularios declarativos**. Para agregar o quitar campos, casi siempre basta con tocar este archivo. Los tipos de campo están documentados al inicio.
+- `docs/tablero.js`: Tablero con filtros (campaña, periodo, lotes, gastos generales) y pestañas Resumen/Costos/Ventas/Mes a mes/Clima. Calcula todo en el celular desde `accion=tablero`; gráficos SVG propios (colores fijos por lote, paleta validada para daltonismo; cada gráfico tiene vista de tabla).
 - `docs/app.js`: almacenamiento (DB), datos y cola (Datos), sincronización (Sync), vistas y rutas `#/...`.
 - `docs/sw.js` + `docs/version.js`: modo offline. **Sube `APP_VERSION` en cada cambio**; si no, los celulares siguen con la versión anterior.
 - `apps-script/Api.gs`: `doGet` (`accion=datos|ping`) y `doPost` (`ops: agregar|editar`). Escribe **por nombre de columna**.
@@ -41,3 +42,4 @@ Clave de prueba: `clave-prueba`.
 ## Historial de versiones
 - 1.0.0 (nov 2026): formularios de jornal (grupal), labor, aplicación, compra, gasto, venta (kg/jaba), cobro, plan de fertilización y catálogos; vistas de pagar planilla, resumen, stock, por cobrar, clima e historial; modo offline.
 - 1.1.0 (nov 2026): Ajustes con URL y clave ocultas; PIN de administrador local (hash SHA-256 en `config.pinHash`) para ver o cambiar la conexión y copiar el enlace de configuración. Prueba: `pruebas/prueba_pin.js`.
+- 1.2.0 (nov 2026): Tablero y reportes (requiere Api.gs 1.1.0 con `accion=tablero`). Opción de pedir PIN para ver el Tablero. Prueba: `pruebas/prueba_tablero.js`.

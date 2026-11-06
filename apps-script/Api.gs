@@ -17,7 +17,7 @@
  *  Implementar > Gestionar implementaciones > (lápiz) > Versión: Nueva versión > Implementar.
  */
 
-const API_VERSION = '1.0.0';
+const API_VERSION = '1.1.0';
 
 // Tablas que la app puede leer como catálogos (listas para elegir).
 const API_CATALOGOS = ['Lotes', 'Campanas', 'Trabajadores', 'Productos', 'Proveedores',
@@ -109,6 +109,7 @@ function doGet(e) {
     const accion = e.parameter.accion || 'datos';
     if (accion === 'ping') return { version: API_VERSION };
     if (accion === 'datos') return apiDatos_();
+    if (accion === 'tablero') return apiTablero_();
     throw new Error('Acción desconocida: ' + accion);
   });
 }
@@ -181,6 +182,25 @@ function apiDatos_() {
     };
   }
   return out;
+}
+
+/**
+ * Datos completos para el TABLERO: todas las filas de los registros (solo columnas de datos,
+ * los totales los calcula la app) y todo el clima. Formato compacto: {enc: [...], filas: [[...]]}.
+ */
+function apiTablero_() {
+  const ss = SpreadsheetApp.getActive();
+  const tablas = {};
+  ['Planilla', 'Aplicaciones', 'Compras_Insumos', 'Costos', 'Ventas', 'Cobros', 'Plan_Fertilizacion', 'Clima'].forEach(n => {
+    const sh = ss.getSheetByName(n);
+    if (!sh) return;
+    const datos = sh.getDataRange().getValues();
+    if (!datos.length) return;
+    const enc = datos[0].map(String);
+    const filas = datos.slice(1).filter(f => f[0] !== '' && f[0] !== null).map(f => f.map(apiSerializar_));
+    tablas[n] = { enc: enc, filas: filas };
+  });
+  return { tablas: tablas, actualizado: new Date().toISOString() };
 }
 
 /** Devuelve filas como objetos {Columna: valor}. ultimas = 0 → todas. */

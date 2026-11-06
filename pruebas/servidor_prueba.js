@@ -92,6 +92,14 @@ http.createServer((req, res) => {
   const u = new URL(req.url, 'http://x');
   const cors = { 'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json' };
   if (u.pathname === '/_offline') { offline = u.searchParams.get('v') === '1'; res.end('ok'); return; }
+  if (u.pathname === '/_sembrar' && req.method === 'POST') { // solo pruebas: {hoja, filas} o {hoja, celdas:[[fila,col,valor]]}
+    let b = ''; req.on('data', d => b += d); req.on('end', () => {
+      const j = JSON.parse(b); const h = estado[j.hoja];
+      (j.filas || []).forEach(f => h.push(f.map(v => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) ? new Date(v + 'T00:00:00') : v)));
+      (j.celdas || []).forEach(([r, c, v]) => { h[r - 1][c - 1] = v; });
+      sucio = true; res.end('ok');
+    }); return;
+  }
   if (u.pathname === '/_estado') { res.writeHead(200, cors); res.end(JSON.stringify({ estado, fotos })); return; }
   if (u.pathname === '/api') {
     if (offline) { req.destroy(); return; }
