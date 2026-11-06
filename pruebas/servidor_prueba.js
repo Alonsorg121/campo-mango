@@ -104,8 +104,8 @@ http.createServer((req, res) => {
       res.writeHead(200, cors); res.end(out.t);
     }); return;
   }
-  let p = path.join(RAIZ, 'app', u.pathname === '/' ? 'index.html' : u.pathname);
-  if (!p.startsWith(path.join(RAIZ, 'app')) || !fs.existsSync(p)) { res.writeHead(404); res.end(); return; }
+  let p = path.join(RAIZ, 'docs', u.pathname === '/' ? 'index.html' : u.pathname);
+  if (!p.startsWith(path.join(RAIZ, 'docs')) || !fs.existsSync(p)) { res.writeHead(404); res.end(); return; }
   res.writeHead(200, { 'Content-Type': tipos[path.extname(p)] || 'application/octet-stream' });
   fs.createReadStream(p).pipe(res);
 }).listen(PUERTO, () => console.log('Prueba en http://localhost:' + PUERTO));
