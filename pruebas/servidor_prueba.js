@@ -97,6 +97,7 @@ http.createServer((req, res) => {
       const j = JSON.parse(b); const h = estado[j.hoja];
       (j.filas || []).forEach(f => h.push(f.map(v => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) ? new Date(v + 'T00:00:00') : v)));
       (j.celdas || []).forEach(([r, c, v]) => { h[r - 1][c - 1] = v; });
+      if (j.insertar) h.splice(j.insertar.fila - 1, 0, j.insertar.valores);
       sucio = true; res.end('ok');
     }); return;
   }

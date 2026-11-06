@@ -323,6 +323,9 @@ Vistas.tablero = async (pest) => {
   if (!Tablero.filtro) Tablero.filtro = { campana: Datos.campanaActiva(), lotes: reales.map(l => l.ID_Lote), periodo: 'campana', desde: '', hasta: '', generales: true };
   const F = Tablero.filtro;
   F.lotes = F.lotes.filter(id => reales.some(l => l.ID_Lote === id));
+  // lotes agregados después en el Sheets: entran marcados
+  F.conocidos = F.conocidos || reales.map(l => l.ID_Lote);
+  reales.forEach(l => { if (!F.conocidos.includes(l.ID_Lote)) { F.conocidos.push(l.ID_Lote); if (!F.lotes.includes(l.ID_Lote)) F.lotes.push(l.ID_Lote); } });
   if (!F.lotes.length && reales.length && !F._ninguno) F.lotes = reales.map(l => l.ID_Lote);
 
   if (!Tablero.datos) {
